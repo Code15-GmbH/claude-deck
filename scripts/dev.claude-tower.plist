@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Autostart for the tower server at login. NOT installed automatically.
+     Install:   cp scripts/dev.claude-tower.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/dev.claude-tower.plist
+     Remove:    launchctl unload ~/Library/LaunchAgents/dev.claude-tower.plist && rm ~/Library/LaunchAgents/dev.claude-tower.plist
+     Logs:      ~/.claude-tower/server.log -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>dev.claude-tower</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <!-- nvm's node is not on launchd's PATH: use the newest installed one -->
+    <string>NODE="$(command -v node || ls -d "$HOME"/.nvm/versions/node/*/bin/node | sort -V | tail -1)"; mkdir -p "$HOME/.claude-tower"; exec "$NODE" /Users/nicomeyer/Documents/Projects/claude-tower/server/server.mjs &gt;&gt; "$HOME/.claude-tower/server.log" 2&gt;&amp;1</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+</dict>
+</plist>
