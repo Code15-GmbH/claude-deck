@@ -6,6 +6,9 @@
 //   waiting  Claude needs a decision (permission prompt)
 //   done     turn finished -> needs your attention
 //   ended    session closed (SessionEnd, or the claude process is gone)
+//
+// ackedAt: you cleared a done/waiting strip from the attention bay by hand. The status stays
+// truthful; the next prompt, stop or permission prompt brings the session back.
 import path from 'node:path';
 
 const clip = (s, n) => {
@@ -41,6 +44,7 @@ export function newSession(ev) {
     turnStartedAt: null,
     finishedAt: null,
     attentionAt: null,
+    ackedAt: null,
     endedAt: null,
     location: null,
     branch: '',
@@ -78,12 +82,14 @@ export function applyEvent(sessions, ev) {
       s.turnStartedAt = ts;
       s.turns += 1;
       s.waitingReason = '';
+      s.ackedAt = null;
       s.endedAt = null;
       break;
     case 'Stop':
       s.status = 'done';
       s.finishedAt = ts;
       s.attentionAt = ts;
+      s.ackedAt = null;
       s.waitingReason = '';
       if (ev.lastMessage) s.lastMessage = clip(ev.lastMessage, 400);
       if (ev.prompt && !s.prompt) s.prompt = clip(ev.prompt, 400);
@@ -91,6 +97,7 @@ export function applyEvent(sessions, ev) {
     case 'Notification':
       s.status = 'waiting';
       s.attentionAt = ts;
+      s.ackedAt = null;
       s.waitingReason = clip(ev.message, 160);
       break;
     case 'SessionEnd':
@@ -100,6 +107,16 @@ export function applyEvent(sessions, ev) {
     default:
       return false;
   }
+  return true;
+}
+
+export const needsYou = (s) => (s.status === 'done' || s.status === 'waiting') && !s.ackedAt;
+
+/** Clears a strip from the attention bay (acked = false puts it back). Returns true when something changed. */
+export function acknowledge(sessions, id, acked = true, now = Date.now()) {
+  const s = sessions[id];
+  if (!s || (s.status !== 'done' && s.status !== 'waiting') || Boolean(s.ackedAt) === acked) return false;
+  s.ackedAt = acked ? now : null;
   return true;
 }
 
@@ -113,14 +130,14 @@ export function prune(sessions, now = Date.now()) {
   return changed;
 }
 
-/** Order used by the board: attention bay newest-first, working bay newest-first. */
+/** Order used by the board: attention bay newest-first, working bay newest-first, cleared strips lead the quiet row. */
 export function board(sessions) {
   const list = Object.values(sessions);
-  const attention = list.filter((s) => s.status === 'done' || s.status === 'waiting')
+  const attention = list.filter(needsYou)
     .sort((a, b) => (b.attentionAt || 0) - (a.attentionAt || 0));
   const working = list.filter((s) => s.status === 'working')
     .sort((a, b) => (b.turnStartedAt || 0) - (a.turnStartedAt || 0));
-  const quiet = list.filter((s) => s.status === 'idle' || s.status === 'ended')
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  const quiet = list.filter((s) => s.status !== 'working' && !needsYou(s))
+    .sort((a, b) => Math.max(b.updatedAt, b.ackedAt || 0) - Math.max(a.updatedAt, a.ackedAt || 0));
   return { attention, working, quiet };
 }

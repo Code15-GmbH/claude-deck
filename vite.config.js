@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// `npm run dev` serves the UI with hot reload and proxies /api to the running tower server.
+// `npm run dev` serves the UI with hot reload and proxies /api to the running deck server.
 export default defineConfig({
   root: 'web',
   plugins: [react()],

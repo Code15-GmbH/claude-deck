@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Autostart for the deck server at login. NOT installed automatically.
+     Install:   sed "s|/path/to/claude-deck|$PWD|" scripts/de.code15.claude-deck.plist > ~/Library/LaunchAgents/de.code15.claude-deck.plist && launchctl load ~/Library/LaunchAgents/de.code15.claude-deck.plist
+     Remove:    launchctl unload ~/Library/LaunchAgents/de.code15.claude-deck.plist && rm ~/Library/LaunchAgents/de.code15.claude-deck.plist
+     Logs:      ~/.claude-deck/server.log -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>de.code15.claude-deck</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <!-- nvm's node is not on launchd's PATH: use the newest installed one -->
+    <string>NODE="$(command -v node || ls -d "$HOME"/.nvm/versions/node/*/bin/node | sort -V | tail -1)"; mkdir -p "$HOME/.claude-deck"; exec "$NODE" /path/to/claude-deck/server/server.mjs &gt;&gt; "$HOME/.claude-deck/server.log" 2&gt;&amp;1</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+</dict>
+</plist>

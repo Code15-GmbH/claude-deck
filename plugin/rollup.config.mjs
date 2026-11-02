@@ -1,12 +1,16 @@
 import commonjs from '@rollup/plugin-commonjs';
 import json from '@rollup/plugin-json';
 import nodeResolve from '@rollup/plugin-node-resolve';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const sdPlugin = 'de.code15.claude-sessions.sdPlugin';
+// Paths are absolute so `rollup -c plugin/rollup.config.mjs` works from the repo root.
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const sdPlugin = path.join(HERE, 'de.code15.claude-sessions.sdPlugin');
 
 export default {
-  input: 'src/plugin.js',
-  output: { file: `${sdPlugin}/bin/plugin.js`, format: 'es', sourcemap: false },
+  input: path.join(HERE, 'src', 'plugin.js'),
+  output: { file: path.join(sdPlugin, 'bin', 'plugin.js'), format: 'es', sourcemap: false },
   // ws's optional native accelerators are not needed
   external: ['bufferutil', 'utf-8-validate'],
   plugins: [

@@ -12,8 +12,8 @@ const SOUND = '/System/Library/Sounds/Glass.aiff';
 const playSound = () => execFile('afplay', [SOUND], () => {});
 
 export class Board {
-  constructor(tower) {
-    this.tower = tower;
+  constructor(client) {
+    this.client = client;
     this.profile = '';
     this.page = 0;
     this.pages = 1;
@@ -23,8 +23,8 @@ export class Board {
     this.cellBySlot = new Map();
     this.list = [];
     this.prevWaiting = null;  // null until the first state arrived (no alarm for sessions that already wait)
-    tower.on('state', () => this.update(true));
-    tower.on('connection', () => this.update(false));
+    client.on('state', () => this.update(true));
+    client.on('connection', () => this.update(false));
     this.ticker = setInterval(() => this.renderAll(), 15000); // age counters
   }
 
@@ -55,7 +55,7 @@ export class Board {
   }
 
   update(fromState) {
-    const sessions = this.tower.sessions;
+    const sessions = this.client.sessions;
     if (this.profile && !M.profilesOf(sessions).includes(this.profile)) this.profile = ''; // filtered profile has no sessions any more
     this.list = M.visibleSessions(sessions, this.profile);
     if (fromState) this.checkAlarm(sessions);
@@ -75,11 +75,11 @@ export class Board {
     this.page = pg.page;
     this.pages = pg.pages;
     const now = Date.now();
-    const connected = this.tower.connected;
+    const connected = this.client.connected;
     slots.forEach((slot, i) => {
       const cell = pg.cells[i] || { kind: 'empty' };
       this.cellBySlot.set(slot.action.id, cell);
-      const img = !connected ? R.renderOffline(this.tower.lastError)
+      const img = !connected ? R.renderOffline(this.client.lastError)
         : cell.kind === 'session' ? R.renderSession(cell.entry, now)
         : cell.kind === 'overflow' ? R.renderOverflow(cell)
         : R.renderEmpty();
@@ -92,12 +92,12 @@ export class Board {
     const o = this.others.get(id);
     if (!o) return;
     const c = M.counts(this.list);
-    const connected = this.tower.connected;
+    const connected = this.client.connected;
     let img;
     switch (o.kind) {
       case 'next': img = R.renderNext(c.waiting + c.done, connected); break;
       case 'overview': img = R.renderOverview(c, connected); break;
-      case 'profile': img = R.renderProfile(this.profile, M.profilesOf(this.tower.sessions)); break;
+      case 'profile': img = R.renderProfile(this.profile, M.profilesOf(this.client.sessions)); break;
       case 'page': {
         const shown = [...this.cellBySlot.values()].filter((cell) => cell.kind === 'session').length;
         img = R.renderPage(this.page, this.pages, shown, c.total);
@@ -119,13 +119,13 @@ export class Board {
   /** Brings the session's terminal to the front; a finished turn counts as seen afterwards. */
   async jump(entry, action) {
     try {
-      const r = await this.tower.focus(entry.session.id);
+      const r = await this.client.focus(entry.session.id);
       if (!r.ok) {
         streamDeck.logger.warn(`focus ${entry.label}: ${r.reason}`);
         await action.showAlert();
         return;
       }
-      if (entry.kind === 'done') await this.tower.ack(entry.session.id, true);
+      if (entry.kind === 'done') await this.client.ack(entry.session.id, true);
       await action.showOk();
     } catch (e) {
       streamDeck.logger.error(`focus: ${e.message}`);
@@ -136,7 +136,7 @@ export class Board {
   nextPage() { this.page = (this.page + 1) % Math.max(1, this.pages); this.renderAll(); }
 
   cycleProfile() {
-    const all = ['', ...M.profilesOf(this.tower.sessions)];
+    const all = ['', ...M.profilesOf(this.client.sessions)];
     this.profile = all[(all.indexOf(this.profile) + 1) % all.length];
     this.page = 0;
     this.saveSettings();
@@ -177,7 +177,7 @@ export class Overview extends BoardAction {
   onWillAppear(ev) { this.board.addOther(ev.action, 'overview'); }
   onWillDisappear(ev) { this.board.removeOther(ev.action.id); }
   onKeyDown(ev) {
-    const url = this.board.tower.dashboardUrl();
+    const url = this.board.client.dashboardUrl();
     return url ? streamDeck.system.openUrl(url) : ev.action.showAlert();
   }
 }

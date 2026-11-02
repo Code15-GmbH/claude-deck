@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Plays fake Claude sessions against the running tower server (for testing the board).
+// Plays fake Claude sessions against the running deck server (for testing the board).
 //
 //   node scripts/simulate.mjs          ~40 s story: sessions start, work, finish one by one
 //   node scripts/simulate.mjs --fast   jump straight to a filled board
@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const cfg = JSON.parse(fs.readFileSync(path.join(process.env.TOWER_HOME || path.join(os.homedir(), '.claude-tower'), 'config.json'), 'utf8'));
+const cfg = JSON.parse(fs.readFileSync(path.join(process.env.CLAUDE_DECK_HOME || path.join(os.homedir(), '.claude-deck'), 'config.json'), 'utf8'));
 const URL_ = `http://127.0.0.1:${cfg.port}/api/event`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const myIterm = (process.env.ITERM_SESSION_ID || '').split(':')[1] || '';

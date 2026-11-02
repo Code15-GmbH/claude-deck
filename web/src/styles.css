@@ -1,4 +1,4 @@
-/* Claude Tower — dark wall display. Readable from a few metres, no interaction needed. */
+/* Claude Deck dashboard: dark wall display. Readable from a few metres; tapping a strip clears it, nothing else needs interaction. */
 :root {
   --bg: #0b0f14;
   --panel: #111821;
@@ -26,7 +26,7 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
 button { font: inherit; }
 code { font-family: var(--mono); background: var(--strip); padding: .1em .35em; border-radius: 4px; }
 
-.tower { min-height: 100vh; padding: 16px clamp(16px, 2vw, 32px) 24px; display: flex; flex-direction: column; gap: 16px; }
+.deck { min-height: 100vh; padding: 16px clamp(16px, 2vw, 32px) 24px; display: flex; flex-direction: column; gap: 16px; }
 
 /* --- top bar --- */
 .top { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
@@ -53,12 +53,24 @@ code { font-family: var(--mono); background: var(--strip); padding: .1em .35em; 
 
 /* --- bays --- */
 .bays { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; align-items: start; align-content: start; flex: 1; }
-@media (max-width: 1000px) { .bays { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 1000px) {
+  .bays, .bays.left-hidden { grid-template-columns: minmax(0, 1fr); }
+  .bay-rail { flex-direction: row; padding: 10px 14px; }
+  .bay-rail .label { writing-mode: horizontal-tb; }
+}
 .bay { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
 .bay-head { display: flex; align-items: baseline; gap: 10px; padding: 2px 6px 10px; }
 .bay-head h2 { margin: 0; font-size: .8em; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); font-weight: 600; }
 .bay-head .count { font-family: var(--mono); color: var(--text); font-weight: 700; }
 .bay-head .hint { margin-left: auto; font-size: .7em; color: var(--dim); }
+.bay-head.tap { cursor: pointer; user-select: none; }
+.bay-head.tap:hover h2 { color: var(--text); }
+/* collapsed left bay: slim strip that stays tappable, right bay takes the freed space */
+.bays.left-hidden { grid-template-columns: 3em minmax(0, 1fr); }
+.bay-rail { align-self: stretch; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; color: var(--muted); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 14px 0; }
+.bay-rail:hover { color: var(--text); border-color: var(--muted); }
+.bay-rail .count { font-family: var(--mono); font-weight: 700; color: var(--attn); }
+.bay-rail .label { writing-mode: vertical-rl; font-size: .8em; text-transform: uppercase; letter-spacing: .14em; font-weight: 600; }
 .bay-list { display: flex; flex-direction: column; gap: 10px; }
 .empty { color: var(--dim); padding: 24px 8px; text-align: center; }
 
@@ -102,6 +114,9 @@ code { font-family: var(--mono); background: var(--strip); padding: .1em .35em; 
 .strip.waiting { --glow: var(--wait); animation: strip-in .7s cubic-bezier(.2, .9, .25, 1.15) both, glow 1.2s ease-in-out .7s infinite; }
 .strip.cold { opacity: .55; }
 .strip.cold .band { filter: saturate(.4); }
+.strip.tap { cursor: pointer; }
+.strip.tap:hover, .strip.tap:focus-visible { border-color: var(--text); outline: none; }
+.strip.tap:active { opacity: .6; }
 
 @keyframes strip-in {
   0% { transform: translateX(40%) scale(.98); opacity: 0; }
@@ -123,6 +138,8 @@ code { font-family: var(--mono); background: var(--strip); padding: .1em .35em; 
 .mini-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mini-when { font-family: var(--mono); white-space: nowrap; color: var(--dim); }
 .mini.ended { opacity: .5; }
+.mini.tap { cursor: pointer; }
+.mini.tap:hover, .mini.tap:focus-visible { border-color: var(--muted); color: var(--text); outline: none; }
 
 /* --- full-screen flash on arrival --- */
 .flash { position: fixed; inset: 0; pointer-events: none; display: flex; align-items: flex-start; justify-content: center; animation: flash 4.2s ease-out forwards; z-index: 10; }

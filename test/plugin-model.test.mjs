@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { counts, formatAge, kindOf, paginate, profilesOf, shortProfile, visibleSessions, wrapName } from '../src/model.js';
+import { counts, formatAge, kindOf, paginate, profilesOf, shortProfile, visibleSessions, wrapName } from '../plugin/src/model.js';
 
 const s = (over) => ({ id: over.id || Math.random().toString(36).slice(2), profile: 'main', project: 'proj', status: 'idle', updatedAt: 1000, startedAt: 500, ackedAt: null, ...over });
 
-test('kindOf maps tower status, ack and closed tabs', () => {
+test('kindOf maps server status, ack and closed tabs', () => {
   assert.equal(kindOf(s({ status: 'waiting' })), 'waiting');
   assert.equal(kindOf(s({ status: 'done' })), 'done');
   assert.equal(kindOf(s({ status: 'done', ackedAt: 1 })), 'idle');

@@ -1,6 +1,6 @@
-// Client for the local claude-tower server (../claude-tower): subscribes to the SSE
+// Client for the local claude-deck server (../claude-deck): subscribes to the SSE
 // stream for live session state and calls /api/focus and /api/ack on key presses.
-// Port and view token come from ~/.claude-tower/config.json (re-read on every connect).
+// Port and view token come from ~/.claude-deck/config.json (re-read on every connect).
 import { EventEmitter } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -8,10 +8,10 @@ import path from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-export class TowerClient extends EventEmitter {
+export class DeckClient extends EventEmitter {
   constructor(opts = {}) {
     super();
-    this.dir = opts.dir || process.env.TOWER_HOME || path.join(os.homedir(), '.claude-tower');
+    this.dir = opts.dir || process.env.CLAUDE_DECK_HOME || path.join(os.homedir(), '.claude-deck');
     this.sessions = [];
     this.connected = false;
     this.lastError = '';
@@ -46,7 +46,7 @@ export class TowerClient extends EventEmitter {
 
   async stream() {
     const cfg = this.config();
-    if (!cfg) throw new Error('~/.claude-tower/config.json fehlt (Tower nie gestartet?)');
+    if (!cfg) throw new Error('~/.claude-deck/config.json missing (server never started?)');
     this.ctrl = new AbortController();
     const res = await fetch(`${cfg.base}/api/stream?key=${encodeURIComponent(cfg.key)}`, { signal: this.ctrl.signal, headers: { Accept: 'text/event-stream' } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -92,7 +92,7 @@ export class TowerClient extends EventEmitter {
 
   async post(p, body) {
     const cfg = this.config();
-    if (!cfg) throw new Error('Tower-Konfiguration fehlt');
+    if (!cfg) throw new Error('Server configuration missing');
     const res = await fetch(`${cfg.base}${p}?key=${encodeURIComponent(cfg.key)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(6000),
     });

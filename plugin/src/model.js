@@ -1,6 +1,6 @@
 // Pure logic: which sessions show up, in which order, on which key. No I/O, unit-tested.
 //
-// A "kind" is what the key shows (tower status + acknowledgement + terminal state):
+// A "kind" is what the key shows (server status + acknowledgement + terminal state):
 //   waiting  Claude asks for a permission             -> red, most urgent
 //   done     turn finished, nobody looked yet          -> amber
 //   working  Claude is on it                           -> dark with green edge

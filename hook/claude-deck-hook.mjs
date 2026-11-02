@@ -1,20 +1,20 @@
 #!/usr/bin/env node
-// Claude Code hook -> Claude Tower. Wire it for SessionStart, UserPromptSubmit, Stop,
+// Claude Code hook -> Claude Deck. Wire it for SessionStart, UserPromptSubmit, Stop,
 // Notification and SessionEnd (scripts/install-hooks.mjs does that).
 //
 // It reads the hook JSON from stdin, adds what only the session process knows
-// (profile, claude pid, terminal ids, AI session title) and POSTs it to the tower
+// (profile, claude pid, terminal ids, AI session title) and POSTs it to the deck server
 // server. It NEVER blocks Claude: every failure exits 0 silently (errors are logged
-// to ~/.claude-tower/hook-errors.log) and the request times out after 1.5 s.
+// to ~/.claude-deck/hook-errors.log) and the request times out after 1.5 s.
 //
-// Target: TOWER_URL env, else http://127.0.0.1:<port from ~/.claude-tower/config.json>.
-// TOWER_DRY_RUN=1 prints the event instead of sending it.
+// Target: CLAUDE_DECK_URL env, else http://127.0.0.1:<port from ~/.claude-deck/config.json>.
+// CLAUDE_DECK_DRY_RUN=1 prints the event instead of sending it.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-const DIR = process.env.TOWER_HOME || path.join(os.homedir(), '.claude-tower');
+const DIR = process.env.CLAUDE_DECK_HOME || path.join(os.homedir(), '.claude-deck');
 const clip = (s, n) => { s = String(s ?? '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 const logError = (msg) => {
   try {
@@ -66,7 +66,7 @@ function aiTitle(file) {
 }
 
 function target() {
-  if (process.env.TOWER_URL) return { url: process.env.TOWER_URL.replace(/\/$/, '') + '/api/event', token: process.env.TOWER_TOKEN || '' };
+  if (process.env.CLAUDE_DECK_URL) return { url: process.env.CLAUDE_DECK_URL.replace(/\/$/, '') + '/api/event', token: process.env.CLAUDE_DECK_TOKEN || '' };
   const cfg = JSON.parse(fs.readFileSync(path.join(DIR, 'config.json'), 'utf8'));
   return { url: `http://127.0.0.1:${cfg.port || 4777}/api/event`, token: cfg.ingestToken };
 }
@@ -103,7 +103,7 @@ async function main() {
   if (event === 'SessionStart') ev.source = input.source || '';
   if (event === 'SessionEnd') ev.reason = input.reason || '';
 
-  if (e.TOWER_DRY_RUN) { process.stdout.write(JSON.stringify(ev, null, 2) + '\n'); return; }
+  if (e.CLAUDE_DECK_DRY_RUN) { process.stdout.write(JSON.stringify(ev, null, 2) + '\n'); return; }
   const { url, token } = target();
   const res = await fetch(url, {
     method: 'POST',

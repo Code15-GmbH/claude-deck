@@ -9259,7 +9259,7 @@ const streamDeck = {
 
 // Pure logic: which sessions show up, in which order, on which key. No I/O, unit-tested.
 //
-// A "kind" is what the key shows (tower status + acknowledgement + terminal state):
+// A "kind" is what the key shows (server status + acknowledgement + terminal state):
 //   waiting  Claude asks for a permission             -> red, most urgent
 //   done     turn finished, nobody looked yet          -> amber
 //   working  Claude is on it                           -> dark with green edge
@@ -9486,12 +9486,12 @@ function renderOverflow(cell) {
 }
 
 function renderOffline(reason = '') {
-  const lines = wrapName(reason ? 'Tower nicht erreichbar' : 'Tower startet', 14);
+  const lines = wrapName(reason ? 'Server nicht erreichbar' : 'Server startet', 14);
   return toDataUri(svg(
     base(C.darker, C.red) +
     label('Offline', C.grey, 'plug') +
     nameLines(lines, C.grey, 68, 14) +
-    `<text x="12" y="125" font-family="${FONT}" font-size="9" fill="${C.faint}">npm start in claude-tower</text>`,
+    `<text x="12" y="125" font-family="${FONT}" font-size="9" fill="${C.faint}">npm start in claude-deck</text>`,
   ));
 }
 
@@ -9561,8 +9561,8 @@ const SOUND = '/System/Library/Sounds/Glass.aiff';
 const playSound = () => execFile('afplay', [SOUND], () => {});
 
 class Board {
-  constructor(tower) {
-    this.tower = tower;
+  constructor(client) {
+    this.client = client;
     this.profile = '';
     this.page = 0;
     this.pages = 1;
@@ -9572,8 +9572,8 @@ class Board {
     this.cellBySlot = new Map();
     this.list = [];
     this.prevWaiting = null;  // null until the first state arrived (no alarm for sessions that already wait)
-    tower.on('state', () => this.update(true));
-    tower.on('connection', () => this.update(false));
+    client.on('state', () => this.update(true));
+    client.on('connection', () => this.update(false));
     this.ticker = setInterval(() => this.renderAll(), 15000); // age counters
   }
 
@@ -9604,7 +9604,7 @@ class Board {
   }
 
   update(fromState) {
-    const sessions = this.tower.sessions;
+    const sessions = this.client.sessions;
     if (this.profile && !profilesOf(sessions).includes(this.profile)) this.profile = ''; // filtered profile has no sessions any more
     this.list = visibleSessions(sessions, this.profile);
     if (fromState) this.checkAlarm(sessions);
@@ -9624,11 +9624,11 @@ class Board {
     this.page = pg.page;
     this.pages = pg.pages;
     const now = Date.now();
-    const connected = this.tower.connected;
+    const connected = this.client.connected;
     slots.forEach((slot, i) => {
       const cell = pg.cells[i] || { kind: 'empty' };
       this.cellBySlot.set(slot.action.id, cell);
-      const img = !connected ? renderOffline(this.tower.lastError)
+      const img = !connected ? renderOffline(this.client.lastError)
         : cell.kind === 'session' ? renderSession(cell.entry, now)
         : cell.kind === 'overflow' ? renderOverflow(cell)
         : renderEmpty();
@@ -9641,12 +9641,12 @@ class Board {
     const o = this.others.get(id);
     if (!o) return;
     const c = counts(this.list);
-    const connected = this.tower.connected;
+    const connected = this.client.connected;
     let img;
     switch (o.kind) {
       case 'next': img = renderNext(c.waiting + c.done, connected); break;
       case 'overview': img = renderOverview(c, connected); break;
-      case 'profile': img = renderProfile(this.profile, profilesOf(this.tower.sessions)); break;
+      case 'profile': img = renderProfile(this.profile, profilesOf(this.client.sessions)); break;
       case 'page': {
         const shown = [...this.cellBySlot.values()].filter((cell) => cell.kind === 'session').length;
         img = renderPage(this.page, this.pages, shown, c.total);
@@ -9668,13 +9668,13 @@ class Board {
   /** Brings the session's terminal to the front; a finished turn counts as seen afterwards. */
   async jump(entry, action) {
     try {
-      const r = await this.tower.focus(entry.session.id);
+      const r = await this.client.focus(entry.session.id);
       if (!r.ok) {
         streamDeck.logger.warn(`focus ${entry.label}: ${r.reason}`);
         await action.showAlert();
         return;
       }
-      if (entry.kind === 'done') await this.tower.ack(entry.session.id, true);
+      if (entry.kind === 'done') await this.client.ack(entry.session.id, true);
       await action.showOk();
     } catch (e) {
       streamDeck.logger.error(`focus: ${e.message}`);
@@ -9685,7 +9685,7 @@ class Board {
   nextPage() { this.page = (this.page + 1) % Math.max(1, this.pages); this.renderAll(); }
 
   cycleProfile() {
-    const all = ['', ...profilesOf(this.tower.sessions)];
+    const all = ['', ...profilesOf(this.client.sessions)];
     this.profile = all[(all.indexOf(this.profile) + 1) % all.length];
     this.page = 0;
     this.saveSettings();
@@ -9726,7 +9726,7 @@ class Overview extends BoardAction {
   onWillAppear(ev) { this.board.addOther(ev.action, 'overview'); }
   onWillDisappear(ev) { this.board.removeOther(ev.action.id); }
   onKeyDown(ev) {
-    const url = this.board.tower.dashboardUrl();
+    const url = this.board.client.dashboardUrl();
     return url ? streamDeck.system.openUrl(url) : ev.action.showAlert();
   }
 }
@@ -9752,16 +9752,16 @@ class Alarm extends BoardAction {
   onKeyDown() { this.board.toggleAlarm(); }
 }
 
-// Client for the local claude-tower server (../claude-tower): subscribes to the SSE
+// Client for the local claude-deck server (../claude-deck): subscribes to the SSE
 // stream for live session state and calls /api/focus and /api/ack on key presses.
-// Port and view token come from ~/.claude-tower/config.json (re-read on every connect).
+// Port and view token come from ~/.claude-deck/config.json (re-read on every connect).
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-class TowerClient extends EventEmitter$1 {
+class DeckClient extends EventEmitter$1 {
   constructor(opts = {}) {
     super();
-    this.dir = opts.dir || process.env.TOWER_HOME || path.join(os.homedir(), '.claude-tower');
+    this.dir = opts.dir || process.env.CLAUDE_DECK_HOME || path.join(os.homedir(), '.claude-deck');
     this.sessions = [];
     this.connected = false;
     this.lastError = '';
@@ -9796,7 +9796,7 @@ class TowerClient extends EventEmitter$1 {
 
   async stream() {
     const cfg = this.config();
-    if (!cfg) throw new Error('~/.claude-tower/config.json fehlt (Tower nie gestartet?)');
+    if (!cfg) throw new Error('~/.claude-deck/config.json missing (server never started?)');
     this.ctrl = new AbortController();
     const res = await fetch(`${cfg.base}/api/stream?key=${encodeURIComponent(cfg.key)}`, { signal: this.ctrl.signal, headers: { Accept: 'text/event-stream' } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -9842,7 +9842,7 @@ class TowerClient extends EventEmitter$1 {
 
   async post(p, body) {
     const cfg = this.config();
-    if (!cfg) throw new Error('Tower-Konfiguration fehlt');
+    if (!cfg) throw new Error('Server configuration missing');
     const res = await fetch(`${cfg.base}${p}?key=${encodeURIComponent(cfg.key)}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(6000),
     });
@@ -9859,17 +9859,17 @@ class TowerClient extends EventEmitter$1 {
 
 // Entry point of the Stream Deck plugin (bundled to de.code15.claude-sessions.sdPlugin/bin/plugin.js).
 
-const tower = new TowerClient();
-const board = new Board(tower);
+const client = new DeckClient();
+const board = new Board(client);
 
 for (const Action of [SessionSlot, NextUrgent, Overview, ProfileFilter, Page, Alarm]) {
   streamDeck.actions.registerAction(new Action(board));
 }
 
-tower.on('connection', (ok, err) => streamDeck.logger.info(ok ? 'Tower verbunden' : `Tower getrennt: ${err}`));
-tower.on('error', (e) => streamDeck.logger.warn(`Tower: ${e.message}`));
+client.on('connection', (ok, err) => streamDeck.logger.info(ok ? 'Server connected' : `Server disconnected: ${err}`));
+client.on('error', (e) => streamDeck.logger.warn(`Server: ${e.message}`));
 
 streamDeck.connect().then(async () => {
   await board.loadSettings();
-  tower.start();
+  client.start();
 });

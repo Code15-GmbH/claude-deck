@@ -2,25 +2,39 @@
   "name": "claude-deck",
   "version": "0.1.0",
   "private": true,
-  "description": "Stream-Deck-Plugin: alle Claude-Code-Sessions im Blick, per Tastendruck zur richtigen Session springen (liest claude-tower)",
+  "description": "Every Claude Code session at a glance: a local session-state server fed by Claude Code hooks, a Stream Deck plugin that jumps to the session that needs you, and a browser dashboard for a tablet or wall screen.",
+  "license": "MIT",
   "type": "module",
   "scripts": {
-    "icons": "node scripts/make-icons.mjs",
-    "build": "npm run icons && rollup -c",
-    "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart de.code15.claude-sessions\"",
-    "link": "streamdeck link de.code15.claude-sessions.sdPlugin",
-    "restart": "streamdeck restart de.code15.claude-sessions",
-    "validate": "streamdeck validate de.code15.claude-sessions.sdPlugin",
-    "profile": "node scripts/make-profile.mjs",
+    "start": "node server/server.mjs",
+    "urls": "node server/server.mjs --urls",
+    "hooks:check": "node scripts/install-hooks.mjs",
+    "hooks:install": "node scripts/install-hooks.mjs --apply",
+    "hooks:uninstall": "node scripts/install-hooks.mjs --uninstall --apply",
+    "web:build": "vite build",
+    "web:dev": "vite",
+    "plugin:icons": "node plugin/scripts/make-icons.mjs",
+    "plugin:build": "npm run plugin:icons && rollup -c plugin/rollup.config.mjs",
+    "plugin:watch": "rollup -c plugin/rollup.config.mjs -w --watch.onEnd=\"streamdeck restart de.code15.claude-sessions\"",
+    "plugin:link": "streamdeck link plugin/de.code15.claude-sessions.sdPlugin",
+    "plugin:restart": "streamdeck restart de.code15.claude-sessions",
+    "plugin:validate": "streamdeck validate plugin/de.code15.claude-sessions.sdPlugin",
+    "plugin:profile": "node plugin/scripts/make-profile.mjs",
+    "build": "npm run web:build && npm run plugin:build",
+    "simulate": "node scripts/simulate.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
-    "@elgato/streamdeck": "^3.0.4"
+    "@elgato/streamdeck": "^3.0.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^28.0.0",
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.0",
-    "rollup": "^4.0.0"
+    "@vitejs/plugin-react": "^5.0.0",
+    "rollup": "^4.0.0",
+    "vite": "^7.0.0"
   }
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyEvent, board, prune } from '../server/store.mjs';
+import { acknowledge, applyEvent, board, prune } from '../server/store.mjs';
 
 const ev = (event, extra = {}) => ({ event, sessionId: 'a', cwd: '/x/figoca', profile: 'planni', ts: 1000, ...extra });
 
@@ -59,4 +59,23 @@ test('long text is clipped', () => {
   const s = {};
   applyEvent(s, ev('UserPromptSubmit', { prompt: 'x'.repeat(2000) }));
   assert.ok(s.a.prompt.length <= 400);
+});
+
+test('acknowledge clears a strip from the attention bay until the session reports again', () => {
+  const s = {};
+  applyEvent(s, ev('Stop', { ts: 5000 }));
+  assert.equal(acknowledge(s, 'a', true, 6000), true);
+  assert.equal(acknowledge(s, 'a', true, 6500), false); // already cleared
+  assert.equal(s.a.status, 'done');
+  assert.deepEqual(board(s).attention, []);
+  assert.deepEqual(board(s).quiet.map((x) => x.id), ['a']);
+  assert.equal(acknowledge(s, 'a', false), true); // put back
+  assert.deepEqual(board(s).attention.map((x) => x.id), ['a']);
+  acknowledge(s, 'a', true, 7000);
+  applyEvent(s, ev('UserPromptSubmit', { prompt: 'weiter', ts: 8000 }));
+  applyEvent(s, ev('Stop', { ts: 9000 }));
+  assert.deepEqual(board(s).attention.map((x) => x.id), ['a']); // next result shows up again
+  assert.equal(acknowledge(s, 'nope'), false);
+  applyEvent(s, ev('UserPromptSubmit', { prompt: 'x', ts: 9500 }));
+  assert.equal(acknowledge(s, 'a'), false); // nothing to clear while working
 });

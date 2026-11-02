@@ -1,9 +1,11 @@
 #!/usr/bin/env node
-// Claude Tower server — runs on the Mac, zero dependencies.
+// Claude Deck server — runs on the Mac, zero dependencies.
 //
 //   POST /api/event    hook events           (Authorization: Bearer <ingestToken>)
 //   GET  /api/state    current board as JSON (?key=<viewToken>)
 //   GET  /api/stream   Server-Sent Events    (?key=<viewToken>)
+//   POST /api/ack      clear a strip from "Braucht dich" / put it back (?key=<viewToken>, {id, acked})
+//   POST /api/focus    bring a session's terminal to the front (?key=<viewToken>, {id}) — used by the Stream Deck plugin
 //   GET  /api/health   {ok:true}
 //   GET  /*            the React dashboard (web/dist)
 //
@@ -16,15 +18,16 @@ import crypto from 'node:crypto';
 import { execFile, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { loadOrCreateConfig, lanAddresses, STATE, DIR } from './config.mjs';
-import { applyEvent, prune } from './store.mjs';
+import { applyEvent, acknowledge, prune } from './store.mjs';
 import { locateAll, ensureHelper } from './locate.mjs';
+import { focusSession } from './focus.mjs';
 import os from 'node:os';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DIST = path.join(HERE, '..', 'web', 'dist');
 const cfg = loadOrCreateConfig();
-const PORT = Number(process.env.TOWER_PORT || cfg.port);
-const HOST = process.env.TOWER_HOST || cfg.host;
+const PORT = Number(process.env.CLAUDE_DECK_PORT || cfg.port);
+const HOST = process.env.CLAUDE_DECK_HOST || cfg.host;
 
 function urls() {
   let name = '';
@@ -152,13 +155,26 @@ const server = http.createServer(async (req, res) => {
         req.on('close', () => clients.delete(res));
         return;
       }
+      if (p === '/api/ack' && req.method === 'POST') {
+        const { id, acked = true } = JSON.parse(await readBody(req));
+        if (acknowledge(sessions, id, acked !== false)) changed();
+        return send(res, 204, '');
+      }
+      if (p === '/api/focus' && req.method === 'POST') {
+        const { id } = JSON.parse(await readBody(req));
+        const s = sessions[id];
+        if (!s) return send(res, 404, { ok: false, reason: 'unknown-session' });
+        const result = await focusSession(s);
+        scheduleRefresh(); // the window may have moved to the current desktop
+        return send(res, result.ok ? 200 : 409, result);
+      }
       return send(res, 404, { error: 'not found' });
     }
 
     // static dashboard (contains no data; data needs the key)
     let file = path.normalize(path.join(DIST, p === '/' ? 'index.html' : p));
     if (!file.startsWith(DIST) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) file = path.join(DIST, 'index.html');
-    if (!fs.existsSync(file)) return send(res, 503, 'Dashboard noch nicht gebaut: npm run build', 'text/plain; charset=utf-8');
+    if (!fs.existsSync(file)) return send(res, 503, 'Dashboard not built yet: npm run web:build', 'text/plain; charset=utf-8');
     return send(res, 200, fs.readFileSync(file), MIME[path.extname(file)] || 'application/octet-stream');
   } catch (e) {
     return send(res, 400, { error: e.message });
@@ -169,12 +185,12 @@ setInterval(() => { for (const res of clients) res.write('event: ping\ndata: {}\
 setInterval(refresh, 10e3);
 
 server.on('error', (e) => {
-  console.error(e.code === 'EADDRINUSE' ? `Port ${PORT} ist belegt — läuft der Tower schon? (lsof -nP -iTCP:${PORT})` : e.message);
+  console.error(e.code === 'EADDRINUSE' ? `Port ${PORT} is in use. Is the server already running? (lsof -nP -iTCP:${PORT})` : e.message);
   process.exit(1);
 });
 server.listen(PORT, HOST, async () => {
-  console.log(`Claude Tower läuft auf ${HOST}:${PORT}`);
+  console.log(`Claude Deck server listening on ${HOST}:${PORT}`);
   console.log('Dashboard:\n  ' + urls().join('\n  '));
-  if (await ensureHelper()) console.log('Desktop-Erkennung: aktiv'); else console.log('Desktop-Erkennung: aus (swiftc fehlt)');
+  if (await ensureHelper()) console.log('Desktop detection: on'); else console.log('Desktop detection: off (swiftc missing)');
   refresh();
 });

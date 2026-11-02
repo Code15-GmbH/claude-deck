@@ -96,12 +96,12 @@ export function renderOverflow(cell) {
 }
 
 export function renderOffline(reason = '') {
-  const lines = wrapName(reason ? 'Tower nicht erreichbar' : 'Tower startet', 14);
+  const lines = wrapName(reason ? 'Server nicht erreichbar' : 'Server startet', 14);
   return toDataUri(svg(
     base(C.darker, C.red) +
     label('Offline', C.grey, 'plug') +
     nameLines(lines, C.grey, 68, 14) +
-    `<text x="12" y="125" font-family="${FONT}" font-size="9" fill="${C.faint}">npm start in claude-tower</text>`,
+    `<text x="12" y="125" font-family="${FONT}" font-size="9" fill="${C.faint}">npm start in claude-deck</text>`,
   ));
 }
 

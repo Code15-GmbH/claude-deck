@@ -1,14 +1,14 @@
-// Shared config: ~/.claude-tower/config.json (created on first server start, chmod 600).
-//   port         HTTP port of the tower server (default 4777)
+// Shared config: ~/.claude-deck/config.json (created on first server start, chmod 600).
+//   port         HTTP port of the deck server (default 4777)
 //   host         bind address; 0.0.0.0 = reachable from tablet / Raspberry Pi in the LAN
 //   ingestToken  secret the hook needs to POST events (never leaves the Mac)
-//   viewToken    secret in the dashboard URL (?key=...) — read-only
+//   viewToken    secret in the dashboard URL (?key=...) — reads the board, can only clear/restore strips
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-export const DIR = process.env.TOWER_HOME || path.join(os.homedir(), '.claude-tower');
+export const DIR = process.env.CLAUDE_DECK_HOME || path.join(os.homedir(), '.claude-deck');
 export const CONFIG = path.join(DIR, 'config.json');
 export const STATE = path.join(DIR, 'state.json');
 

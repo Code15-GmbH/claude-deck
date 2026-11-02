@@ -11,8 +11,8 @@ const store = {
   get: (k) => { try { return localStorage.getItem(k); } catch { return null; } },
   set: (k, v) => { try { localStorage.setItem(k, v); } catch {} },
 };
-if (params.get('key')) store.set('tower.key', params.get('key'));
-const KEY = params.get('key') || store.get('tower.key') || '';
+if (params.get('key')) store.set('deck.key', params.get('key'));
+const KEY = params.get('key') || store.get('deck.key') || '';
 const MINIMAL = params.get('minimal') === '1';
 const STILL = params.get('still') === '1'; // no motion (weak hardware, screenshots)
 
@@ -40,13 +40,16 @@ function span(ms) {
 }
 const clock = (t) => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
 
+// done/waiting and not cleared by hand (same rule as server/store.mjs)
+const needsYou = (s) => (s.status === 'done' || s.status === 'waiting') && !s.ackedAt;
+
 function board(sessions) {
-  const attention = sessions.filter((s) => s.status === 'done' || s.status === 'waiting')
+  const attention = sessions.filter(needsYou)
     .sort((a, b) => (b.attentionAt || 0) - (a.attentionAt || 0));
   const working = sessions.filter((s) => s.status === 'working')
     .sort((a, b) => (b.turnStartedAt || 0) - (a.turnStartedAt || 0));
-  const quiet = sessions.filter((s) => s.status === 'idle' || s.status === 'ended')
-    .sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 12);
+  const quiet = sessions.filter((s) => s.status !== 'working' && !needsYou(s))
+    .sort((a, b) => Math.max(b.updatedAt, b.ackedAt || 0) - Math.max(a.updatedAt, a.ackedAt || 0)).slice(0, 12);
   return { attention, working, quiet };
 }
 
@@ -81,7 +84,7 @@ function chime(kind) {
 }
 
 // --- data --------------------------------------------------------------------
-function useTower() {
+function useDeck() {
   const [snap, setSnap] = useState(null);
   const [status, setStatus] = useState('connecting'); // connecting | live | offline | denied
   const [lastSeen, setLastSeen] = useState(Date.now());
@@ -106,6 +109,18 @@ function useTower() {
   return { snap, status, lastSeen };
 }
 
+// clears a strip from "Braucht dich" (acked = false puts it back); the board follows via the stream
+const ack = (id, acked) => fetch(`/api/ack?key=${encodeURIComponent(KEY)}`, {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, acked }),
+}).catch(() => {});
+
+// tappable strip; a tap that ends a text selection does not count
+const tap = (fn, title) => ({
+  role: 'button', tabIndex: 0, title,
+  onClick: () => { if (!String(getSelection())) fn(); },
+  onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(); } },
+});
+
 function useNow(ms = 5000) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), ms); return () => clearInterval(t); }, [ms]);
@@ -113,7 +128,7 @@ function useNow(ms = 5000) {
 }
 
 // --- UI ----------------------------------------------------------------------
-function Strip({ s, now, compact }) {
+function Strip({ s, now, compact, onAck }) {
   const p = profileOf(s.profile);
   const since = s.attentionAt ? now - s.attentionAt : 0;
   const state = s.status === 'waiting' ? 'waiting' : s.status;
@@ -127,8 +142,9 @@ function Strip({ s, now, compact }) {
   const statusLabel = { done: 'FERTIG', waiting: 'FREIGABE', working: 'IN ARBEIT', idle: 'BEREIT', ended: 'ENDE' }[state];
 
   if (compact) {
+    const back = s.ackedAt && (s.status === 'done' || s.status === 'waiting') ? tap(() => ack(s.id, false), 'Antippen: zurück nach „Braucht dich“') : null;
     return (
-      <div className={`mini ${state}`} style={{ '--band': p.color }}>
+      <div className={`mini ${state} ${back ? 'tap' : ''}`} style={{ '--band': p.color }} {...back}>
         <span className="mini-band" />
         <span className="mini-proj">{s.project}</span>
         <span className="mini-title">{s.title || '—'}</span>
@@ -137,7 +153,7 @@ function Strip({ s, now, compact }) {
     );
   }
   return (
-    <article className={`strip ${state} ${heat}`} style={{ '--band': p.color }}>
+    <article className={`strip ${state} ${heat} ${onAck ? 'tap' : ''}`} style={{ '--band': p.color }} {...(onAck ? tap(() => onAck(s.id, true), 'Antippen: erledigt, vom Board nehmen') : null)}>
       <div className="band"><span>{p.label}</span></div>
       <div className="body">
         <div className="row1">
@@ -158,24 +174,26 @@ function Strip({ s, now, compact }) {
   );
 }
 
-function Bay({ title, hint, list, now, empty }) {
+// `onToggle` makes the header tappable (collapses the bay); `onAck` makes each strip tappable (clears it).
+function Bay({ title, hint, list, now, empty, onToggle, onAck }) {
   return (
     <section className="bay">
-      <header className="bay-head"><h2>{title}</h2><span className="count">{list.length}</span>{hint && <span className="hint">{hint}</span>}</header>
+      <header className={`bay-head ${onToggle ? 'tap' : ''}`} onClick={onToggle} title={onToggle ? 'Antippen zum Ausblenden' : undefined}><h2>{title}</h2><span className="count">{list.length}</span>{hint && <span className="hint">{hint}</span>}</header>
       <div className="bay-list">
-        {list.length ? list.map((s) => <Strip key={`${s.id}-${s.status}`} s={s} now={now} />) : <div className="empty">{empty}</div>}
+        {list.length ? list.map((s) => <Strip key={`${s.id}-${s.status}`} s={s} now={now} onAck={onAck} />) : <div className="empty">{empty}</div>}
       </div>
     </section>
   );
 }
 
 export default function App() {
-  const { snap, status, lastSeen } = useTower();
+  const { snap, status, lastSeen } = useDeck();
   const now0 = useNow(5000);
   const offset = snap ? snap.now - snap.receivedAt : 0; // Mac clock vs. this device
   const now = now0 + offset;
-  const [sound, setSound] = useState(params.get('sound') === '1' || store.get('tower.sound') === '1');
+  const [sound, setSound] = useState(params.get('sound') === '1' || store.get('deck.sound') === '1');
   const [flash, setFlash] = useState(null);
+  const [leftHidden, setLeftHidden] = useState(store.get('deck.leftHidden') === '1'); // left bay collapsed for focus
   const prev = useRef(null);
 
   const sessions = snap?.sessions || [];
@@ -186,7 +204,7 @@ export default function App() {
     if (!snap) return;
     const cur = new Map(sessions.map((s) => [s.id, `${s.status}:${s.attentionAt}`]));
     if (prev.current) {
-      const arrived = sessions.filter((s) => (s.status === 'done' || s.status === 'waiting') && prev.current.get(s.id) !== cur.get(s.id));
+      const arrived = sessions.filter((s) => needsYou(s) && prev.current.get(s.id) !== cur.get(s.id));
       if (arrived.length) {
         const kind = arrived.some((s) => s.status === 'waiting') ? 'waiting' : 'done';
         setFlash({ kind, at: Date.now(), label: arrived.map((s) => s.project).join(' · ') });
@@ -198,25 +216,26 @@ export default function App() {
   useEffect(() => { if (!flash) return; const t = setTimeout(() => setFlash(null), 4200); return () => clearTimeout(t); }, [flash]);
   useEffect(() => {
     const fresh = b.attention.filter((s) => now - s.attentionAt < COLD_MS).length;
-    document.title = fresh ? `(${fresh}) Claude Tower` : 'Claude Tower';
+    document.title = fresh ? `(${fresh}) Claude Deck` : 'Claude Deck';
   }, [b, now]);
 
-  const toggleSound = () => { const v = !sound; setSound(v); store.set('tower.sound', v ? '1' : '0'); if (v) chime('done'); };
+  const toggleSound = () => { const v = !sound; setSound(v); store.set('deck.sound', v ? '1' : '0'); if (v) chime('done'); };
+  const toggleLeft = () => { const v = !leftHidden; setLeftHidden(v); store.set('deck.leftHidden', v ? '1' : '0'); };
   const offline = status === 'offline' || (status === 'live' && Date.now() - lastSeen > 45e3);
 
   if (status === 'denied') {
     return (
       <main className="gate">
-        <h1>Claude Tower</h1>
+        <h1>Claude Deck</h1>
         <p>Kein oder falscher Schlüssel. Öffne die Adresse mit <code>?key=…</code> — auf dem Mac zeigt <code>npm run urls</code> die fertigen Links.</p>
       </main>
     );
   }
 
   return (
-    <main className={`tower ${offline ? 'is-offline' : ''} ${STILL ? 'still' : ''}`}>
+    <main className={`deck ${offline ? 'is-offline' : ''} ${STILL ? 'still' : ''}`}>
       <header className="top">
-        <div className="brand"><span className="logo" aria-hidden />CLAUDE TOWER</div>
+        <div className="brand"><span className="logo" aria-hidden />CLAUDE DECK</div>
         <div className="stats">
           <span className="stat attn">{b.attention.length}<small>braucht dich</small></span>
           <span className="stat work">{b.working.length}<small>in Arbeit</small></span>
@@ -231,8 +250,10 @@ export default function App() {
 
       {offline && <div className="offline-banner">Keine Verbindung zum Mac seit {clock(lastSeen)} — Anzeige ist eingefroren.</div>}
 
-      <div className="bays">
-        <Bay title="Braucht dich" hint="neueste oben" list={b.attention} now={now} empty="Nichts wartet auf dich." />
+      <div className={`bays ${leftHidden ? 'left-hidden' : ''}`}>
+        {leftHidden
+          ? <button className="bay-rail" onClick={toggleLeft} title="Antippen zum Einblenden"><span className="count">{b.attention.length}</span><span className="label">Braucht dich</span></button>
+          : <Bay title="Braucht dich" hint="neueste oben · Streifen antippen = erledigt" list={b.attention} now={now} empty="Nichts wartet auf dich." onToggle={toggleLeft} onAck={ack} />}
         <Bay title="In Arbeit" list={b.working} now={now} empty="Gerade arbeitet keine Session." />
       </div>
 
