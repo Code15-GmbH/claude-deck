@@ -1,0 +1,26 @@
+{
+  "name": "claude-tower",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fluglotsen-Board für alle laufenden Claude-Code-Sessions (alle Profile, alle Projekte)",
+  "type": "module",
+  "scripts": {
+    "start": "node server/server.mjs",
+    "urls": "node server/server.mjs --urls",
+    "build": "vite build",
+    "dev": "vite",
+    "test": "node --test test/*.test.mjs",
+    "simulate": "node scripts/simulate.mjs",
+    "hooks:check": "node scripts/install-hooks.mjs",
+    "hooks:install": "node scripts/install-hooks.mjs --apply",
+    "hooks:uninstall": "node scripts/install-hooks.mjs --uninstall --apply"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "vite": "^7.0.0"
+  }
+}
