@@ -1,0 +1,77 @@
+{
+  "Name": "Claude Sessions",
+  "Version": "0.1.0.0",
+  "Author": "code15",
+  "Description": "Alle Claude-Code-Sessions auf dem Stream Deck: Rot wartet auf Freigabe, Gelb ist fertig, Grün arbeitet. Tastendruck springt zum iTerm-Tab der Session. Liest den lokalen claude-tower-Server.",
+  "UUID": "de.code15.claude-sessions",
+  "Icon": "imgs/plugin-icon",
+  "CodePath": "bin/plugin.js",
+  "Nodejs": { "Version": "20", "Debug": "enabled" },
+  "SDKVersion": 3,
+  "Software": { "MinimumVersion": "7.1" },
+  "OS": [{ "Platform": "mac", "MinimumVersion": "13" }],
+  "Category": "Claude Sessions",
+  "CategoryIcon": "imgs/plugin-icon",
+  "Actions": [
+    {
+      "Name": "Session",
+      "UUID": "de.code15.claude-sessions.slot",
+      "Icon": "imgs/slot",
+      "Tooltip": "Ein Platz für eine Session. Mehrere davon aufs Deck legen; sie füllen sich in Lesereihenfolge nach Dringlichkeit. Druck springt zur Session.",
+      "Controllers": ["Keypad"],
+      "SupportedInMultiActions": false,
+      "UserTitleEnabled": false,
+      "States": [{ "Image": "imgs/key" }]
+    },
+    {
+      "Name": "Nächste dringende",
+      "UUID": "de.code15.claude-sessions.next",
+      "Icon": "imgs/next",
+      "Tooltip": "Springt zur dringendsten Session (Freigabe vor Fertig).",
+      "Controllers": ["Keypad"],
+      "SupportedInMultiActions": false,
+      "UserTitleEnabled": false,
+      "States": [{ "Image": "imgs/key" }]
+    },
+    {
+      "Name": "Übersicht",
+      "UUID": "de.code15.claude-sessions.overview",
+      "Icon": "imgs/overview",
+      "Tooltip": "Zähler je Status. Druck öffnet das Tower-Dashboard im Browser.",
+      "Controllers": ["Keypad"],
+      "SupportedInMultiActions": false,
+      "UserTitleEnabled": false,
+      "States": [{ "Image": "imgs/key" }]
+    },
+    {
+      "Name": "Profil-Filter",
+      "UUID": "de.code15.claude-sessions.profile",
+      "Icon": "imgs/profile",
+      "Tooltip": "Schaltet zwischen allen Claude-Profilen und einem einzelnen durch.",
+      "Controllers": ["Keypad"],
+      "SupportedInMultiActions": false,
+      "UserTitleEnabled": false,
+      "States": [{ "Image": "imgs/key" }]
+    },
+    {
+      "Name": "Seite",
+      "UUID": "de.code15.claude-sessions.page",
+      "Icon": "imgs/page",
+      "Tooltip": "Blättert, wenn mehr Sessions laufen als Session-Tasten liegen.",
+      "Controllers": ["Keypad"],
+      "SupportedInMultiActions": false,
+      "UserTitleEnabled": false,
+      "States": [{ "Image": "imgs/key" }]
+    },
+    {
+      "Name": "Alarm",
+      "UUID": "de.code15.claude-sessions.alarm",
+      "Icon": "imgs/alarm",
+      "Tooltip": "Ton, sobald eine Session auf eine Freigabe wartet. Druck schaltet an oder aus.",
+      "Controllers": ["Keypad"],
+      "SupportedInMultiActions": false,
+      "UserTitleEnabled": false,
+      "States": [{ "Image": "imgs/key" }]
+    }
+  ]
+}

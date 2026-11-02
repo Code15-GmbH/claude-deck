@@ -1,0 +1,26 @@
+{
+  "name": "claude-deck",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Stream-Deck-Plugin: alle Claude-Code-Sessions im Blick, per Tastendruck zur richtigen Session springen (liest claude-tower)",
+  "type": "module",
+  "scripts": {
+    "icons": "node scripts/make-icons.mjs",
+    "build": "npm run icons && rollup -c",
+    "watch": "rollup -c -w --watch.onEnd=\"streamdeck restart de.code15.claude-sessions\"",
+    "link": "streamdeck link de.code15.claude-sessions.sdPlugin",
+    "restart": "streamdeck restart de.code15.claude-sessions",
+    "validate": "streamdeck validate de.code15.claude-sessions.sdPlugin",
+    "profile": "node scripts/make-profile.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "@elgato/streamdeck": "^3.0.4"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.0",
+    "@rollup/plugin-json": "^6.1.0",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "rollup": "^4.0.0"
+  }
+}
