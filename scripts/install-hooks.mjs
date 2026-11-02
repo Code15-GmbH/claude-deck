@@ -55,6 +55,13 @@ function patch(settings) {
       list.push({ matcher: '', hooks: [{ type: 'command', command: `"${HOOK}"`, timeout: 5 }] });
       settings.hooks[event] = list;
       changes.push(`+ ${event}`);
+    } else {
+      // entries from the old claude-tower repo (or a moved checkout) point at the current hook
+      let moved = false;
+      for (const m of list) for (const h of m.hooks || []) {
+        if (isOurs(h) && h.command !== `"${HOOK}"`) { h.command = `"${HOOK}"`; moved = true; }
+      }
+      if (moved) changes.push(`~ ${event}`);
     }
   }
   return changes;
