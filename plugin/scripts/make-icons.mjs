@@ -75,7 +75,7 @@ function raster(size, shapes, ss = 4) {
 const W = hex('#FFFFFF');
 const pluginIcon = [
   rrect(0, 0, 1, 1, 0.22, hex('#141413')),
-  circle(0.26, 0.5, 0.11, hex('#D93B3F')), circle(0.5, 0.5, 0.11, hex('#F2B134')), circle(0.74, 0.5, 0.11, hex('#3DBB7A')),
+  circle(0.26, 0.5, 0.11, hex('#D93B3F')), circle(0.5, 0.5, 0.11, hex('#2F6FE0')), circle(0.74, 0.5, 0.11, hex('#3DBB7A')),
 ];
 const keyImage = [rrect(0, 0, 1, 1, 0.11, hex('#1E1E20')), rrect(0, 0, 1, 0.045, 0, hex('#6E6E72')), circle(0.5, 0.55, 0.06, hex('#3A3A3C'))];
 const actionIcons = {

@@ -24,7 +24,7 @@
       "States": [{ "Image": "imgs/key" }]
     },
     {
-      "Name": "Nächste dringende",
+      "Name": "Nächste",
       "UUID": "de.code15.claude-sessions.next",
       "Icon": "imgs/next",
       "Tooltip": "Springt zur dringendsten Session (Freigabe vor Fertig).",

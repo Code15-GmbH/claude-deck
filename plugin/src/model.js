@@ -2,13 +2,18 @@
 //
 // A "kind" is what the key shows (server status + acknowledgement + terminal state):
 //   waiting  Claude asks for a permission             -> red, most urgent
-//   done     turn finished, nobody looked yet          -> amber
-//   working  Claude is on it                           -> dark with green edge
+//   working  Claude is on it                           -> blue, right behind red so running work is always in view
+//   done     turn finished, not checked off yet        -> green, stays green until the key is pressed
+//   idle     open, nothing pending (or checked off)    -> dark with grey edge
 //   gone     the iTerm tab is closed but claude lives  -> dark with grey edge, warning
-//   idle     open, nothing pending (or already acked)  -> dark with grey edge
 // Ended sessions are not shown at all.
+//
+// Within red, blue and green the oldest comes first: new sessions append at the end, existing keys
+// keep their place, and the leftmost green key is the one that has waited longest (checklist order).
+// Grey keys are newest first and are the first to disappear into the overflow key.
 
-const RANK = { waiting: 0, done: 1, working: 2, gone: 3, idle: 4 };
+const RANK = { waiting: 0, working: 1, done: 2, idle: 3, gone: 4 };
+const OLDEST_FIRST = new Set(['waiting', 'working', 'done']);
 
 export function kindOf(s) {
   if (!s || s.status === 'ended') return null;
@@ -42,7 +47,7 @@ export function profilesOf(sessions) {
 }
 
 /**
- * Sessions to show, most urgent first. Each entry: {session, kind, since, label}.
+ * Sessions to show in deck order (red, blue, green, grey). Each entry: {session, kind, since, label}.
  * Two sessions in the same project and profile get "#1", "#2" by start time.
  */
 export function visibleSessions(sessions, profile = '') {
@@ -53,7 +58,7 @@ export function visibleSessions(sessions, profile = '') {
     if (profile && (s.profile || 'main') !== profile) continue;
     list.push({ session: s, kind, since: sinceOf(s, kind), label: s.project || '?' });
   }
-  list.sort((a, b) => RANK[a.kind] - RANK[b.kind] || b.since - a.since);
+  list.sort((a, b) => RANK[a.kind] - RANK[b.kind] || (OLDEST_FIRST.has(a.kind) ? a.since - b.since : b.since - a.since));
   const groups = new Map();
   for (const e of list) {
     const key = `${e.session.profile || 'main'}/${e.session.project || '?'}`;
@@ -66,6 +71,11 @@ export function visibleSessions(sessions, profile = '') {
       .forEach((e, i) => { e.label = `${e.session.project || '?'} #${i + 1}`; });
   }
   return list;
+}
+
+/** The entry the "Nächste" key jumps to: the oldest permission prompt, else the oldest unchecked finished session. */
+export function nextTarget(list) {
+  return (list || []).find((e) => e.kind === 'waiting') || (list || []).find((e) => e.kind === 'done') || null;
 }
 
 export function counts(list) {
@@ -125,7 +135,7 @@ export function paginate(list, slots, page = 0) {
   while (cells.length < cap) cells.push({ kind: 'empty' });
   if (overflow) {
     const rest = [...list.slice(start + cap), ...list.slice(0, start)]; // what the next pages hold, in order
-    cells.push({ kind: 'overflow', more: rest.length, kinds: rest.slice(0, 3).map((e) => e.kind) });
+    cells.push({ kind: 'overflow', more: rest.length, kinds: rest.slice(0, 6).map((e) => e.kind) });
   }
   return { page, pages, cells };
 }

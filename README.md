@@ -2,7 +2,7 @@
 
 Every Claude Code session at a glance, and one press to get to the one that needs you.
 
-Claude Code hooks report each session to a small local server. Two views read it: a **Stream Deck plugin** that puts every session on a key (red waits for a permission, amber is finished, green is working) and jumps to its iTerm2 tab on press, and a **browser dashboard** for a tablet or wall screen. Works across all Claude profiles, projects, monitors and macOS Spaces.
+Claude Code hooks report each session to a small local server. Two views read it: a **Stream Deck plugin** that puts every session on a key (red waits for a permission, blue is working, green is finished and stays green until you press it) and jumps to its iTerm2 tab on press, and a **browser dashboard** for a tablet or wall screen. Works across all Claude profiles, projects, monitors and macOS Spaces.
 
 Design canvas of the deck layout: https://claude.ai/artifact/D5U39p6TPacMKAtRztTwTT
 
@@ -67,8 +67,8 @@ Then select the profile "Claude Sessions" in the Stream Deck app. For another de
 
 | Key | Shows | On press |
 |---|---|---|
-| **Session** (place as many as you like) | Status, project name, profile badge, time since the last event. Session keys fill in reading order: permission first, then finished, working, idle. | Jumps to the session. A finished session counts as seen afterwards and moves to the back. |
-| **Next urgent** | How many sessions need you | Jumps to the most urgent one |
+| **Session** (place as many as you like) | Status, project name, profile badge, time since the last event. Session keys fill in reading order: red (permission), blue (working), green (finished), grey (idle). Within a colour the oldest comes first, so new sessions append at the end and the leftmost green key is the one that has waited longest. | Jumps to the session. A green key is checked off by the press and turns grey; hold it for 0.6 s to check it off without jumping. |
+| **Next** | How many sessions wait for you, in the colour of the next target (red while a permission is open, green while finished sessions wait) | Jumps to the oldest permission prompt, else the oldest finished session |
 | **Overview** | Counters per status | Opens the dashboard in the browser |
 | **Profile filter** | Current profile or "alle" | Cycles through the profiles |
 | **Page** | Page x/y, how many sessions are visible | Pages forward when more sessions run than session keys exist. The last session slot then shows "+N weitere" and pages as well. |
@@ -78,13 +78,13 @@ Session keys need no settings; their position on the deck defines the order. Pro
 
 | Key state | Look | Meaning |
 |---|---|---|
-| Freigabe | solid red | Claude asks for a permission |
-| Fertig | solid amber | turn finished, nobody looked yet |
-| Arbeitet | dark, green edge | Claude is working |
-| Bereit | dark, grey edge | idle, or finished and already seen |
+| Freigabe | solid red | Claude asks for a permission; stays red until you answer in the terminal |
+| Arbeitet | solid blue | Claude is working |
+| Fertig | solid green | turn finished; stays green until you press the key, like a checklist |
+| Bereit | dark, grey edge, check icon | idle, or finished and checked off |
 | Verwaist | dark, warning icon | the iTerm2 tab is gone but the claude process still runs |
 | Frei | dashed border | no session for this slot |
-| +N weitere | count and status dots | more sessions than slots |
+| +N weitere | count and one dot per hidden session | more sessions than slots; grey keys are the first to go there, a green dot means paging is worth it |
 | Offline | red edge | the server is not reachable |
 
 Key labels and the dashboard are in German for now.

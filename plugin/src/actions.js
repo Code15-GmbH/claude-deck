@@ -8,6 +8,7 @@ import * as M from './model.js';
 import * as R from './render.js';
 
 const UUID = 'de.code15.claude-sessions';
+const LONG_PRESS_MS = 600; // holding a green key this long checks it off without jumping
 const SOUND = '/System/Library/Sounds/Glass.aiff';
 const playSound = () => execFile('afplay', [SOUND], () => {});
 
@@ -21,6 +22,7 @@ export class Board {
     this.slots = new Map();   // action id -> { action, device, column, row }
     this.others = new Map();  // action id -> { action, kind }
     this.cellBySlot = new Map();
+    this.holds = new Map();   // action id -> long-press timer while a key is held
     this.list = [];
     this.prevWaiting = null;  // null until the first state arrived (no alarm for sessions that already wait)
     client.on('state', () => this.update(true));
@@ -95,7 +97,7 @@ export class Board {
     const connected = this.client.connected;
     let img;
     switch (o.kind) {
-      case 'next': img = R.renderNext(c.waiting + c.done, connected); break;
+      case 'next': img = R.renderNext(c, connected); break;
       case 'overview': img = R.renderOverview(c, connected); break;
       case 'profile': img = R.renderProfile(this.profile, M.profilesOf(this.client.sessions)); break;
       case 'page': {
@@ -109,14 +111,39 @@ export class Board {
     o.action.setImage(img).catch((e) => streamDeck.logger.warn(`setImage: ${e.message}`));
   }
 
-  async pressSlot(action) {
+  /** Key down: a green key starts the long-press timer, everything else acts right away. */
+  pressSlot(action) {
     const cell = this.cellBySlot.get(action.id);
     if (!cell) return;
     if (cell.kind === 'overflow') return this.nextPage();
-    if (cell.kind === 'session') return this.jump(cell.entry, action);
+    if (cell.kind !== 'session') return;
+    if (cell.entry.kind !== 'done') return this.jump(cell.entry, action);
+    const timer = setTimeout(() => { this.holds.delete(action.id); this.checkOff(cell.entry, action); }, LONG_PRESS_MS);
+    this.holds.set(action.id, timer);
   }
 
-  /** Brings the session's terminal to the front; a finished turn counts as seen afterwards. */
+  /** Key up before the timer fired: a short tap on a green key jumps and checks it off. */
+  releaseSlot(action) {
+    const timer = this.holds.get(action.id);
+    if (!timer) return;
+    clearTimeout(timer);
+    this.holds.delete(action.id);
+    const cell = this.cellBySlot.get(action.id);
+    if (cell?.kind === 'session') return this.jump(cell.entry, action);
+  }
+
+  /** Long press: checks a finished session off without leaving the current window. */
+  async checkOff(entry, action) {
+    try {
+      await this.client.ack(entry.session.id, true);
+      await action.showOk();
+    } catch (e) {
+      streamDeck.logger.error(`ack: ${e.message}`);
+      await action.showAlert();
+    }
+  }
+
+  /** Brings the session's terminal to the front; a finished turn counts as checked off afterwards. */
   async jump(entry, action) {
     try {
       const r = await this.client.focus(entry.session.id);
@@ -160,6 +187,7 @@ export class SessionSlot extends BoardAction {
   onWillAppear(ev) { this.board.addSlot(ev.action); }
   onWillDisappear(ev) { this.board.removeSlot(ev.action.id); }
   onKeyDown(ev) { return this.board.pressSlot(ev.action); }
+  onKeyUp(ev) { return this.board.releaseSlot(ev.action); }
 }
 
 export class NextUrgent extends BoardAction {
@@ -167,7 +195,7 @@ export class NextUrgent extends BoardAction {
   onWillAppear(ev) { this.board.addOther(ev.action, 'next'); }
   onWillDisappear(ev) { this.board.removeOther(ev.action.id); }
   onKeyDown(ev) {
-    const entry = this.board.list.find((e) => e.kind === 'waiting' || e.kind === 'done');
+    const entry = M.nextTarget(this.board.list);
     return entry ? this.board.jump(entry, ev.action) : ev.action.showAlert();
   }
 }

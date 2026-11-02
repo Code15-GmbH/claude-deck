@@ -7,7 +7,7 @@ const FONT = "-apple-system, 'Helvetica Neue', Helvetica, Arial, sans-serif";
 const MONO = "Menlo, 'SF Mono', Consolas, monospace";
 
 export const C = {
-  red: '#D93B3F', amber: '#F2B134', green: '#3DBB7A', blue: '#4C8DFF', purple: '#9B6CFF', purpleText: '#B894FF',
+  red: '#D93B3F', green: '#3DBB7A', blue: '#2F6FE0', purple: '#9B6CFF', purpleText: '#B894FF',
   dark: '#1E1E20', darker: '#1A1A1B', panel: '#26262A', text: '#E8E8E6', grey: '#9A9A96', greyBand: '#6E6E72',
   dash: '#3A3A3C', faint: '#4A4A4C', pillDark: '#2C2C30', pillText: '#B9B9B5', ink: '#1A1A1A', white: '#FFFFFF',
 };
@@ -19,7 +19,7 @@ const ICON = {
   lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   spin: '<path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/>',
-  pause: '<path d="M9 6v12"/><path d="M15 6v12"/>',
+  checkCircle: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/>',
   warn: '<path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.9L2.5 17.5A2 2 0 0 0 4.2 20.5h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
   person: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21h4"/>',
@@ -56,11 +56,12 @@ const pill = (text, fill, color) => {
 const age = (text, color) =>
   `<text x="132" y="125" text-anchor="end" font-family="${MONO}" font-size="11" font-weight="500" fill="${color}">${esc(text)}</text>`;
 
+// Solid red, blue and green for the three states that matter; grey keys stay dark so colour stands out.
 const STYLE = {
   waiting: { bg: C.red, band: '', fg: C.white, labelColor: C.white, label: 'Freigabe', icon: 'lock', pillFill: 'rgba(255,255,255,0.22)', pillText: C.white, ageColor: C.white },
-  done: { bg: C.amber, band: '', fg: C.ink, labelColor: C.ink, label: 'Fertig', icon: 'check', pillFill: 'rgba(0,0,0,0.14)', pillText: C.ink, ageColor: C.ink },
-  working: { bg: C.dark, band: C.green, fg: C.text, labelColor: C.green, label: 'Arbeitet', icon: 'spin', pillFill: C.pillDark, pillText: C.pillText, ageColor: C.grey },
-  idle: { bg: C.dark, band: C.greyBand, fg: C.text, labelColor: C.grey, label: 'Bereit', icon: 'pause', pillFill: C.pillDark, pillText: C.pillText, ageColor: C.grey },
+  working: { bg: C.blue, band: '', fg: C.white, labelColor: C.white, label: 'Arbeitet', icon: 'spin', pillFill: 'rgba(255,255,255,0.22)', pillText: C.white, ageColor: C.white },
+  done: { bg: C.green, band: '', fg: C.ink, labelColor: C.ink, label: 'Fertig', icon: 'check', pillFill: 'rgba(0,0,0,0.14)', pillText: C.ink, ageColor: C.ink },
+  idle: { bg: C.dark, band: C.greyBand, fg: C.grey, labelColor: C.grey, label: 'Bereit', icon: 'checkCircle', pillFill: C.pillDark, pillText: C.pillText, ageColor: C.grey },
   gone: { bg: C.dark, band: C.greyBand, fg: C.grey, labelColor: C.grey, label: 'Verwaist', icon: 'warn', pillFill: C.pillDark, pillText: C.pillText, ageColor: C.grey },
 };
 
@@ -84,10 +85,11 @@ export function renderEmpty() {
   ));
 }
 
-const dotColor = { waiting: C.red, done: C.amber, working: C.green, idle: C.greyBand, gone: C.greyBand };
+const dotColor = { waiting: C.red, working: C.blue, done: C.green, idle: C.greyBand, gone: C.greyBand };
 
+/** One dot per hidden session (up to six) in its key colour: green here means paging is worth it. */
 export function renderOverflow(cell) {
-  const dots = (cell.kinds || []).map((k, i) => `<circle cx="${72 + (i - (cell.kinds.length - 1) / 2) * 16}" cy="108" r="5" fill="${dotColor[k] || C.greyBand}"/>`).join('');
+  const dots = (cell.kinds || []).map((k, i) => `<circle cx="${72 + (i - (cell.kinds.length - 1) / 2) * 14}" cy="108" r="5" fill="${dotColor[k] || C.greyBand}"/>`).join('');
   return toDataUri(svg(
     base(C.panel) +
     `<text x="72" y="66" text-anchor="middle" font-family="${MONO}" font-size="32" font-weight="700" fill="${C.text}">+${cell.more}</text>` +
@@ -105,16 +107,22 @@ export function renderOffline(reason = '') {
   ));
 }
 
-export function renderNext(urgent, connected = true) {
-  const active = connected && urgent > 0;
-  const bg = active ? C.blue : C.panel;
-  const fg = active ? C.white : C.grey;
+/** "Nächste" takes the colour of the key it would jump to: red while a permission is open, green while finished sessions wait, dark otherwise. */
+export function renderNext(c, connected = true) {
+  const open = connected ? c.waiting + c.done : 0;
+  const target = !connected || !open ? null : c.waiting ? 'waiting' : 'done';
+  const bg = target === 'waiting' ? C.red : target === 'done' ? C.green : C.panel;
+  const fg = target === 'waiting' ? C.white : target === 'done' ? C.ink : C.greyBand;
+  const parts = [];
+  if (c.waiting) parts.push(`${c.waiting} Freigabe`);
+  if (c.done) parts.push(`${c.done} fertig`);
+  const sub = !connected ? 'offline' : parts.length ? parts.join(' · ') : 'nichts offen';
   return toDataUri(svg(
     base(bg) +
     icon('arrow', 12, 20, 40, fg, 2.2) +
-    (active ? `<circle cx="118" cy="30" r="14" fill="${C.white}"/><text x="118" y="35" text-anchor="middle" font-family="${MONO}" font-size="14" font-weight="700" fill="${C.blue}">${urgent}</text>` : '') +
-    `<text x="12" y="104" font-family="${FONT}" font-size="14" font-weight="700" fill="${fg}">Nächste</text>` +
-    `<text x="12" y="122" font-family="${FONT}" font-size="14" font-weight="700" fill="${fg}">dringende</text>`,
+    (open ? `<circle cx="118" cy="30" r="14" fill="${fg}"/><text x="118" y="35" text-anchor="middle" font-family="${MONO}" font-size="14" font-weight="700" fill="${bg}">${open}</text>` : '') +
+    `<text x="12" y="110" font-family="${FONT}" font-size="14" font-weight="700" fill="${fg}">Nächste</text>` +
+    `<text x="12" y="126" font-family="${FONT}" font-size="10" fill="${fg}" opacity="0.85">${esc(sub)}</text>`,
   ));
 }
 
@@ -126,7 +134,7 @@ export function renderOverview(c, connected = true) {
   return toDataUri(svg(
     base(C.panel) +
     `<text x="12" y="23" font-family="${FONT}" font-size="10" font-weight="700" letter-spacing="0.8" fill="${C.grey}">ÜBERSICHT</text>` +
-    row(58, C.red, c.waiting, 'Freigabe') + row(86, C.amber, c.done, 'fertig') + row(114, C.green, c.working, 'aktiv'),
+    row(58, C.red, c.waiting, 'Freigabe') + row(86, C.blue, c.working, 'läuft') + row(114, C.green, c.done, 'fertig'),
   ));
 }
 
