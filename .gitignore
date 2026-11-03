@@ -5,3 +5,6 @@ web/dist/
 .DS_Store
 plugin/*.sdPlugin/bin/
 plugin/*.sdPlugin/logs/
+
+# Stream Deck plugin runtime logs
+plugin/de.code15.claude-sessions.sdPlugin/logs/

@@ -1,7 +1,0 @@
-2026-11-02T16:24:16.477Z DEBUG RegistrationParameters: port=28196
-2026-11-02T16:24:16.478Z DEBUG RegistrationParameters: pluginUUID=e15daec8d4248c620d32bd8ee60e4f9b
-2026-11-02T16:24:16.479Z DEBUG RegistrationParameters: registerEvent=registerPlugin
-2026-11-02T16:24:16.479Z DEBUG RegistrationParameters: info={"application":{"font":".AppleSystemUIFont","language":"de","platform":"mac","platformVersion":"26.6.2","version":"7.5.1.22901"},"colors":{"buttonPressedBackgroundColor":"#303030FF","buttonPressedBorderColor":"#646464FF","buttonPressedTextColor":"#969696FF","disabledColor":"#007AFF7F","highlightColor":"#007AFFFF","mouseDownColor":"#2EA8FFFF"},"devicePixelRatio":2,"devices":[{"id":"580787479a9c8a58675aafa6cd24dff4","name":"Stream Deck","size":{"columns":5,"rows":3},"type":0}],"plugin":{"uuid":"de.code15.claude-sessions","version":"0.1.0.0"}}
-2026-11-02T16:24:16.555Z INFO  Server connected
-2026-11-02T16:24:21.387Z INFO  Server disconnected: terminated
-2026-11-02T16:24:24.444Z INFO  Server connected
