@@ -1,5 +1,8 @@
 # claude-deck
 
+[![CI](https://github.com/Code15-GmbH/claude-deck/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Code15-GmbH/claude-deck/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/Code15-GmbH/claude-deck/graph/badge.svg?branch=main)](https://codecov.io/gh/Code15-GmbH/claude-deck)
+
 Every Claude Code session at a glance, and one press to get to the one that needs you.
 
 Claude Code hooks report each session to a small local server. Two views read it: a **Stream Deck plugin** that puts every session on a key (red waits for a permission, blue is working, green is finished and stays green until you press it) and jumps to its iTerm2 tab on press, and a **browser dashboard** for a tablet or wall screen. Works across all Claude profiles, projects, monitors and macOS Spaces.
@@ -24,12 +27,12 @@ Nothing leaves the machine: hooks post to `127.0.0.1`, the dashboard is served i
 | `scripts/install-hooks.mjs` | adds or removes the hook in every Claude profile's `settings.json` |
 | `plugin/` | the Stream Deck plugin (`de.code15.claude-sessions`): sources, manifest, icons, profile generator |
 | `web/` | the React dashboard |
-| `test/` | unit tests for the server's state logic and the plugin's key logic |
+| `test/` | unit tests (Vitest) for the server, hook, installer, Stream Deck plugin, icon/profile generators and dashboard helpers |
 
 ## Requirements
 
 - macOS with iTerm2 (jumping to a session works for iTerm2; other terminals only get their app activated)
-- Node.js 20 or newer
+- Node.js 20 or newer (22.12 or newer to run the tests)
 - For the Stream Deck part: Stream Deck app 7.1 or newer and `npm install -g @elgato/cli`
 - Optional: `swiftc` (Xcode command line tools) for desktop names such as "Desktop 5 · Display 2"
 
@@ -125,12 +128,15 @@ Environment: `CLAUDE_DECK_HOME` (data folder, default `~/.claude-deck`), `CLAUDE
 ## Development
 
 ```sh
-npm test                 # server state logic and plugin key logic (node --test)
+npm test                 # unit tests (Vitest)
+npm run test:coverage    # unit tests with coverage report in coverage/
 npm run simulate         # plays five fake sessions against the running server (--fast, --end)
 npm run web:dev          # dashboard with hot reload, proxies /api to the running server
 npm run plugin:watch     # rebuilds the plugin on change and restarts it
 npm run plugin:validate  # checks the plugin manifest
 ```
+
+CI (`.github/workflows/ci.yml`) builds the dashboard and the plugin and runs the tests with coverage on Node 22 and 24 for every push to `main` and every pull request; the coverage goes to Codecov. The suite fails when coverage drops below 90 %.
 
 Plugin logs: `plugin/de.code15.claude-sessions.sdPlugin/logs/`. Server log when run as LaunchAgent: `~/.claude-deck/server.log`.
 
