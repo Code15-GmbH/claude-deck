@@ -1,4 +1,4 @@
-import { test } from 'node:test';
+import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import { acknowledge, applyEvent, board, prune } from '../server/store.mjs';
 
@@ -78,4 +78,107 @@ test('acknowledge clears a strip from the attention bay until the session report
   assert.equal(acknowledge(s, 'nope'), false);
   applyEvent(s, ev('UserPromptSubmit', { prompt: 'x', ts: 9500 }));
   assert.equal(acknowledge(s, 'a'), false); // nothing to clear while working
+});
+
+import { needsYou, newSession } from '../server/store.mjs';
+
+test('newSession fills defaults', () => {
+  const n = newSession({ sessionId: 'z', ts: 7 });
+  assert.equal(n.project, '?');
+  assert.equal(n.profile, 'main');
+  assert.equal(n.pid, null);
+  assert.deepEqual(n.term, {});
+  assert.equal(n.startedAt, 7);
+  assert.equal(n.status, 'idle');
+});
+
+test('applyEvent ignores incomplete and unknown events', () => {
+  const s = {};
+  assert.equal(applyEvent(s, null), false);
+  assert.equal(applyEvent(s, { event: 'Stop' }), false);
+  assert.equal(applyEvent(s, { sessionId: 'a' }), false);
+  assert.equal(applyEvent(s, ev('PreToolUse')), false); // creates the session, but nothing visible changed
+  assert.equal(s.a.status, 'idle');
+});
+
+test('applyEvent keeps the freshest facts and falls back to Date.now() without ts', () => {
+  const s = {};
+  applyEvent(s, ev('SessionStart', { ts: undefined, pid: 42, transcript: '/t.jsonl', term: { program: 'iTerm.app' } }));
+  assert.ok(s.a.updatedAt > 1e12);
+  assert.equal(s.a.pid, 42);
+  assert.equal(s.a.transcript, '/t.jsonl');
+  applyEvent(s, ev('UserPromptSubmit', { cwd: '/y/other', profile: 'main', term: {}, title: 't'.repeat(300) }));
+  assert.equal(s.a.project, 'other');
+  assert.equal(s.a.profile, 'main');
+  assert.deepEqual(s.a.term, { program: 'iTerm.app' }); // an empty term does not wipe the known one
+  assert.ok(s.a.title.length <= 120);
+  assert.ok(s.a.title.endsWith('…'));
+});
+
+test('SessionStart: clear resets texts, compact keeps working, resume revives ended', () => {
+  const s = {};
+  applyEvent(s, ev('UserPromptSubmit', { prompt: 'p', title: 'T' }));
+  applyEvent(s, ev('SessionStart', { source: 'compact' }));
+  assert.equal(s.a.status, 'working');
+  applyEvent(s, ev('Stop', { lastMessage: 'done' }));
+  applyEvent(s, ev('SessionStart', { source: 'clear' }));
+  assert.equal(s.a.status, 'idle');
+  assert.equal(s.a.prompt, '');
+  assert.equal(s.a.lastMessage, '');
+  assert.equal(s.a.title, '');
+  applyEvent(s, ev('SessionStart', { source: 'clear', title: 'Neu' }));
+  assert.equal(s.a.title, 'Neu');
+  applyEvent(s, ev('SessionEnd', { ts: 2000 }));
+  applyEvent(s, ev('SessionStart', { source: 'resume', ts: 3000 }));
+  assert.equal(s.a.endedAt, null);
+  assert.equal(s.a.status, 'idle');
+});
+
+test('Stop keeps an existing prompt and adopts one when none is known', () => {
+  const s = {};
+  applyEvent(s, ev('Stop', { prompt: 'aus dem Stop' }));
+  assert.equal(s.a.prompt, 'aus dem Stop');
+  applyEvent(s, ev('Stop', { prompt: 'anderer' }));
+  assert.equal(s.a.prompt, 'aus dem Stop');
+});
+
+test('decisions: elicitation and untyped permission messages count, untyped others do not', () => {
+  const s = {};
+  applyEvent(s, ev('UserPromptSubmit'));
+  assert.equal(applyEvent(s, ev('Notification', { notificationType: 'elicitation_dialog', message: 'Pick one' })), true);
+  assert.equal(s.a.status, 'waiting');
+  const t = {};
+  assert.equal(applyEvent(t, ev('Notification', { message: 'Claude needs your Permission' })), true);
+  assert.equal(applyEvent(t, ev('Notification', { message: 'just idle' })), false);
+  assert.equal(applyEvent(t, ev('Notification', {})), false);
+});
+
+test('needsYou and prune of silent sessions', () => {
+  assert.equal(needsYou({ status: 'done' }), true);
+  assert.equal(needsYou({ status: 'waiting', ackedAt: 1 }), false);
+  assert.equal(needsYou({ status: 'working' }), false);
+  const s = {};
+  applyEvent(s, ev('UserPromptSubmit', { ts: 1000 }));
+  assert.equal(prune(s, 1000 + 2 * 86400e3), false);
+  assert.equal(prune(s, 1000 + 4 * 86400e3), true);
+  assert.deepEqual(s, {});
+  // ended without endedAt falls back to updatedAt
+  const e = { x: { status: 'ended', updatedAt: 0, endedAt: null } };
+  assert.equal(prune(e, 13 * 3600e3), true);
+  assert.equal(prune({}, Date.now()), false);
+});
+
+test('board quiet row: newest activity first, ack time counts as activity', () => {
+  const s = {
+    a: { id: 'a', status: 'idle', updatedAt: 100 },
+    b: { id: 'b', status: 'done', updatedAt: 50, ackedAt: 500 },
+    c: { id: 'c', status: 'ended', updatedAt: 300 },
+    w1: { id: 'w1', status: 'working', updatedAt: 1 },
+    w2: { id: 'w2', status: 'working', updatedAt: 1, turnStartedAt: 5 },
+    d1: { id: 'd1', status: 'done', updatedAt: 1 },
+  };
+  const b = board(s);
+  assert.deepEqual(b.quiet.map((x) => x.id), ['b', 'c', 'a']);
+  assert.deepEqual(b.working.map((x) => x.id), ['w2', 'w1']);
+  assert.deepEqual(b.attention.map((x) => x.id), ['d1']);
 });

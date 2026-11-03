@@ -5,3 +5,4 @@ web/dist/
 .DS_Store
 plugin/*.sdPlugin/bin/
 plugin/*.sdPlugin/logs/
+coverage/

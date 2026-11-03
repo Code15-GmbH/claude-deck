@@ -22,7 +22,9 @@
     "plugin:profile": "node plugin/scripts/make-profile.mjs",
     "build": "npm run web:build && npm run plugin:build",
     "simulate": "node scripts/simulate.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@elgato/streamdeck": "^3.0.4",
@@ -34,7 +36,9 @@
     "@rollup/plugin-json": "^6.1.0",
     "@rollup/plugin-node-resolve": "^16.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "@vitest/coverage-v8": "^5.1.0",
     "rollup": "^4.0.0",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "vitest": "^5.1.0"
   }
 }

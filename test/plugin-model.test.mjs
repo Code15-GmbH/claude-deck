@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { test } from 'vitest';
 import { counts, formatAge, kindOf, nextTarget, paginate, profilesOf, shortProfile, visibleSessions, wrapName } from '../plugin/src/model.js';
 
 const s = (over) => ({ id: over.id || Math.random().toString(36).slice(2), profile: 'main', project: 'proj', status: 'idle', updatedAt: 1000, startedAt: 500, ackedAt: null, ...over });
@@ -94,4 +94,38 @@ test('shortProfile and formatAge', () => {
   assert.equal(formatAge(3 * 60_000 + 5000), '3 min');
   assert.equal(formatAge(65 * 60_000), '1 h 05');
   assert.equal(formatAge(-5), '0 s');
+});
+
+import { sinceOf } from '../plugin/src/model.js';
+
+test('sinceOf picks the timestamp the age counter refers to', () => {
+  assert.equal(sinceOf({ attentionAt: 5, updatedAt: 9 }, 'waiting'), 5);
+  assert.equal(sinceOf({ updatedAt: 9 }, 'done'), 9);
+  assert.equal(sinceOf({}, 'done'), 0);
+  assert.equal(sinceOf({ turnStartedAt: 3, updatedAt: 9 }, 'working'), 3);
+  assert.equal(sinceOf({ updatedAt: 9 }, 'working'), 9);
+  assert.equal(sinceOf({}, 'working'), 0);
+  assert.equal(sinceOf({ updatedAt: 9, ackedAt: 20 }, 'idle'), 20);
+  assert.equal(sinceOf({}, 'gone'), 0);
+});
+
+test('helpers tolerate missing input', () => {
+  assert.equal(kindOf(null), null);
+  assert.equal(kindOf(s({ status: 'waiting', ackedAt: 1 })), 'idle');
+  assert.deepEqual(visibleSessions(undefined), []);
+  assert.deepEqual(profilesOf(undefined), []);
+  assert.deepEqual(counts(undefined).total, 0);
+  assert.equal(nextTarget(undefined), null);
+  assert.equal(shortProfile(''), 'main');
+  assert.equal(shortProfile('_________'), '________'); // nothing but separators: falls back to the name
+  assert.deepEqual(wrapName(null), ['']);
+});
+
+test('visibleSessions falls back to "?" and "main" for missing project and profile', () => {
+  const list = visibleSessions([
+    { id: 'x', status: 'idle', updatedAt: 1 },
+    { id: 'y', status: 'idle', updatedAt: 2 },
+  ], 'main');
+  assert.deepEqual(list.map((e) => e.label), ['? #1', '? #2']); // grey: newest (y) first; equal start times keep list order
+  assert.deepEqual(profilesOf([{ status: 'idle' }]), ['main']);
 });
