@@ -15,18 +15,14 @@ concurrency:
 
 jobs:
   test:
-    name: Test (Node ${{ matrix.node }})
+    name: Test (Node 24)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        node: [22, 24]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: ${{ matrix.node }}
+          node-version: 24
           cache: npm
 
       - run: npm ci
@@ -38,7 +34,6 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload coverage to Codecov
-        if: matrix.node == 24
         uses: codecov/codecov-action@v5
         with:
           files: coverage/lcov.info

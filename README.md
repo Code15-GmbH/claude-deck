@@ -32,7 +32,7 @@ Nothing leaves the machine: hooks post to `127.0.0.1`, the dashboard is served i
 ## Requirements
 
 - macOS with iTerm2 (jumping to a session works for iTerm2; other terminals only get their app activated)
-- Node.js 20 or newer (22.12 or newer to run the tests)
+- Node.js 24 or newer (the Stream Deck plugin itself runs on the Node 20 runtime bundled with the Stream Deck app)
 - For the Stream Deck part: Stream Deck app 7.1 or newer and `npm install -g @elgato/cli`
 - Optional: `swiftc` (Xcode command line tools) for desktop names such as "Desktop 5 · Display 2"
 
@@ -136,7 +136,7 @@ npm run plugin:watch     # rebuilds the plugin on change and restarts it
 npm run plugin:validate  # checks the plugin manifest
 ```
 
-CI (`.github/workflows/ci.yml`) builds the dashboard and the plugin and runs the tests with coverage on Node 22 and 24 for every push to `main` and every pull request; the coverage goes to Codecov. The suite fails when coverage drops below 90 %.
+CI (`.github/workflows/ci.yml`) builds the dashboard and the plugin and runs the tests with coverage on Node 24 for every push to `main` and every pull request; the coverage goes to Codecov. The suite fails when coverage drops below 90 %.
 
 Plugin logs: `plugin/de.code15.claude-sessions.sdPlugin/logs/`. Server log when run as LaunchAgent: `~/.claude-deck/server.log`.
 
