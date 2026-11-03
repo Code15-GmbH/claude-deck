@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ago, board, needsYou, profileOf, span, where } from './lib.js';
 
 // ---------------------------------------------------------------------------
 // URL options:  ?key=<viewToken>   required once (then remembered on this device)
@@ -16,54 +17,10 @@ const KEY = params.get('key') || store.get('deck.key') || '';
 const MINIMAL = params.get('minimal') === '1';
 const STILL = params.get('still') === '1'; // no motion (weak hardware, screenshots)
 
-const PROFILES = {
-  main: { label: 'Normal', color: 'var(--p-main)' },
-  'code15-belege': { label: 'Belege', color: 'var(--p-belege)' },
-  planni: { label: 'Planung', color: 'var(--p-planni)' },
-};
-const profileOf = (name) => PROFILES[name] || { label: name, color: 'var(--p-other)' };
-
 const FRESH_MS = 90e3; // strip glows this long after it finished
 const COLD_MS = 30 * 60e3; // then dims after 30 min without reaction
 
-function ago(ms) {
-  if (ms < 45e3) return 'gerade eben';
-  const m = Math.round(ms / 60e3);
-  if (m < 60) return `vor ${m} min`;
-  const h = Math.floor(m / 60);
-  return h < 24 ? `vor ${h} h ${m % 60 ? `${m % 60} min` : ''}`.trim() : `vor ${Math.floor(h / 24)} T`;
-}
-function span(ms) {
-  const m = Math.floor(ms / 60e3);
-  if (m < 1) return `${Math.max(1, Math.round(ms / 1e3))} s`;
-  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`;
-}
 const clock = (t) => new Date(t).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-
-// done/waiting and not cleared by hand (same rule as server/store.mjs)
-const needsYou = (s) => (s.status === 'done' || s.status === 'waiting') && !s.ackedAt;
-
-function board(sessions) {
-  const attention = sessions.filter(needsYou)
-    .sort((a, b) => (b.attentionAt || 0) - (a.attentionAt || 0));
-  const working = sessions.filter((s) => s.status === 'working')
-    .sort((a, b) => (b.turnStartedAt || 0) - (a.turnStartedAt || 0));
-  const quiet = sessions.filter((s) => s.status !== 'working' && !needsYou(s))
-    .sort((a, b) => Math.max(b.updatedAt, b.ackedAt || 0) - Math.max(a.updatedAt, a.ackedAt || 0)).slice(0, 12);
-  return { attention, working, quiet };
-}
-
-function where(s) {
-  const l = s.location || {};
-  const parts = [l.app || '?'];
-  if (l.gone) parts.push('Tab geschlossen');
-  else {
-    if (l.desktop) parts.push(l.desktop);
-    if (l.tab) parts.push(`Tab ${l.tab}`);
-    if (!l.desktop && l.tty) parts.push(l.tty);
-  }
-  return parts.join(' · ');
-}
 
 // --- sound -------------------------------------------------------------------
 let audio = null;

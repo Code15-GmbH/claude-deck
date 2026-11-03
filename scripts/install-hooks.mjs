@@ -16,31 +16,30 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const HOME = os.homedir();
-const HOOK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'hook', 'claude-deck-hook.sh');
-const MARK = 'claude-deck/hook/claude-deck-hook';
-const LEGACY = 'claude-tower/hook/tower-hook'; // entries from the old claude-tower repo are replaced
-const EVENTS = ['SessionStart', 'UserPromptSubmit', 'Stop', 'Notification', 'SessionEnd'];
-const apply = process.argv.includes('--apply');
-const uninstall = process.argv.includes('--uninstall');
+export const HOOK = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'hook', 'claude-deck-hook.sh');
+export const MARK = 'claude-deck/hook/claude-deck-hook';
+export const LEGACY = 'claude-tower/hook/tower-hook'; // entries from the old claude-tower repo are replaced
+export const EVENTS = ['SessionStart', 'UserPromptSubmit', 'Stop', 'Notification', 'SessionEnd'];
 
-function settingsFiles() {
-  const candidates = [path.join(HOME, '.claude', 'settings.json')];
-  const profiles = path.join(HOME, '.claude-profiles');
+/** Real settings.json path -> the profile paths (with ~) that point at it. */
+export function settingsFiles(home = os.homedir()) {
+  const candidates = [path.join(home, '.claude', 'settings.json')];
+  const profiles = path.join(home, '.claude-profiles');
   try { for (const name of fs.readdirSync(profiles)) candidates.push(path.join(profiles, name, 'settings.json')); } catch {}
   const seen = new Map();
   for (const file of candidates) {
     if (!fs.existsSync(file)) continue;
     const real = fs.realpathSync(file);
     if (!seen.has(real)) seen.set(real, []);
-    seen.get(real).push(file.replace(HOME, '~'));
+    seen.get(real).push(file.replace(home, '~'));
   }
   return seen;
 }
 
-const isOurs = (h) => { const c = String(h?.command || ''); return c.includes(MARK) || c.includes(LEGACY); };
+export const isOurs = (h) => { const c = String(h?.command || ''); return c.includes(MARK) || c.includes(LEGACY); };
 
-function patch(settings) {
+/** Patches one settings object in place; returns the list of changes ("+ Stop", "- Stop", "~ Stop"). */
+export function patch(settings, { uninstall = false, hook = HOOK } = {}) {
   settings.hooks ||= {};
   const changes = [];
   for (const event of EVENTS) {
@@ -52,14 +51,14 @@ function patch(settings) {
       if (next.length) settings.hooks[event] = next; else delete settings.hooks[event];
       changes.push(`- ${event}`);
     } else if (!has) {
-      list.push({ matcher: '', hooks: [{ type: 'command', command: `"${HOOK}"`, timeout: 5 }] });
+      list.push({ matcher: '', hooks: [{ type: 'command', command: `"${hook}"`, timeout: 5 }] });
       settings.hooks[event] = list;
       changes.push(`+ ${event}`);
     } else {
       // entries from the old claude-tower repo (or a moved checkout) point at the current hook
       let moved = false;
       for (const m of list) for (const h of m.hooks || []) {
-        if (isOurs(h) && h.command !== `"${HOOK}"`) { h.command = `"${HOOK}"`; moved = true; }
+        if (isOurs(h) && h.command !== `"${hook}"`) { h.command = `"${hook}"`; moved = true; }
       }
       if (moved) changes.push(`~ ${event}`);
     }
@@ -67,21 +66,30 @@ function patch(settings) {
   return changes;
 }
 
-const stamp = new Date().toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
-let total = 0;
-for (const [real, names] of settingsFiles()) {
-  const raw = fs.readFileSync(real, 'utf8');
-  const settings = JSON.parse(raw);
-  const changes = patch(settings);
-  console.log(`${names.join(' + ')}${names.length > 1 || names[0] !== real.replace(HOME, '~') ? `  (-> ${real.replace(HOME, '~')})` : ''}`);
-  if (!changes.length) { console.log('   ok, nothing to do'); continue; }
-  console.log('   ' + changes.join('  '));
-  total += changes.length;
-  if (apply) {
-    fs.copyFileSync(real, `${real}.bak-${stamp}-deck`);
-    fs.writeFileSync(real, JSON.stringify(settings, null, 2) + '\n');
-    console.log(`   written (backup: ${path.basename(real)}.bak-${stamp}-deck)`);
+/** Runs the installer over every profile. Returns the number of changes. */
+export function run({ argv = process.argv, home = os.homedir(), hook = HOOK, log = console.log, now = new Date() } = {}) {
+  const apply = argv.includes('--apply');
+  const uninstall = argv.includes('--uninstall');
+  const stamp = now.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+  let total = 0;
+  for (const [real, names] of settingsFiles(home)) {
+    const raw = fs.readFileSync(real, 'utf8');
+    const settings = JSON.parse(raw);
+    const changes = patch(settings, { uninstall, hook });
+    log(`${names.join(' + ')}${names.length > 1 || names[0] !== real.replace(home, '~') ? `  (-> ${real.replace(home, '~')})` : ''}`);
+    if (!changes.length) { log('   ok, nothing to do'); continue; }
+    log('   ' + changes.join('  '));
+    total += changes.length;
+    if (apply) {
+      fs.copyFileSync(real, `${real}.bak-${stamp}-deck`);
+      fs.writeFileSync(real, JSON.stringify(settings, null, 2) + '\n');
+      log(`   written (backup: ${path.basename(real)}.bak-${stamp}-deck)`);
+    }
   }
+  if (!apply && total) log(`\nDry run. Add --apply to write${uninstall ? " (remove)" : ""}.`);
+  if (apply && total && !uninstall) log('\nNew hooks apply to newly started Claude sessions (for running ones open /hooks or restart them).');
+  return total;
 }
-if (!apply && total) console.log(`\nDry run. Add --apply to write${uninstall ? " (remove)" : ""}.`);
-if (apply && total && !uninstall) console.log('\nNew hooks apply to newly started Claude sessions (for running ones open /hooks or restart them).');
+
+const isMain = () => { try { return fs.realpathSync(process.argv[1]) === fs.realpathSync(fileURLToPath(import.meta.url)); } catch { return false; } };
+if (isMain()) run();
